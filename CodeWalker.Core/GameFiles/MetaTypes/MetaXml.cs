@@ -471,11 +471,11 @@ namespace CodeWalker.GameFiles
                         break;
                     case MetaStructureEntryDataType.Float_XYZ:
                         var v3 = MetaTypes.ConvertData<Vector3>(data, eoffset);
-                        SelfClosingTag(sb, cind, ename + " x=\"" + FloatUtil.ToString(v3.X) + "\" y=\"" + FloatUtil.ToString(v3.Y) + "\" z=\"" + FloatUtil.ToString(v3.Z) + "\"");
+                        SelfClosingTagVector3(sb, cind, ename, v3);
                         break;
                     case MetaStructureEntryDataType.Float_XYZW:
                         var v4 = MetaTypes.ConvertData<Vector4>(data, eoffset);
-                        SelfClosingTag(sb, cind, ename + " x=\"" + FloatUtil.ToString(v4.X) + "\" y=\"" + FloatUtil.ToString(v4.Y) + "\" z=\"" + FloatUtil.ToString(v4.Z) + "\" w=\"" + FloatUtil.ToString(v4.W) + "\"");
+                        SelfClosingTagVector4(sb, cind, ename, v4);
                         break;
                     case MetaStructureEntryDataType.Hash:
                         var hashVal = MetaTypes.ConvertData<MetaHash>(data, eoffset);
@@ -674,7 +674,7 @@ namespace CodeWalker.GameFiles
                     {
                         var bidx = eoffset + n;
                         byte b = ((bidx >= 0) && (bidx < data.Length)) ? data[bidx] : (byte)0;
-                        sb.Append(b.ToString("X").PadLeft(2, '0'));
+                        sb.Append(HexByteLookup[b]);
                     }
                     break;
                 case MetaStructureEntryDataType.SignedByte:
@@ -1028,23 +1028,23 @@ namespace CodeWalker.GameFiles
                         break;
                     case PsoDataType.Float2:
                         var v2 = MetaTypes.SwapBytes(MetaTypes.ConvertData<Vector2>(data, eoffset));
-                        SelfClosingTag(sb, cind, ename + " x=\"" + FloatUtil.ToString(v2.X) + "\" y=\"" + FloatUtil.ToString(v2.Y) + "\"");
+                        SelfClosingTagVector2(sb, cind, ename, v2);
                         break;
                     case PsoDataType.Float3:
                         var v3 = MetaTypes.SwapBytes(MetaTypes.ConvertData<Vector3>(data, eoffset));
-                        SelfClosingTag(sb, cind, ename + " x=\"" + FloatUtil.ToString(v3.X) + "\" y=\"" + FloatUtil.ToString(v3.Y) + "\" z=\"" + FloatUtil.ToString(v3.Z) + "\"");
+                        SelfClosingTagVector3(sb, cind, ename, v3);
                         break;
                     case PsoDataType.Float3a: //TODO: check this!
                         var v3a = MetaTypes.SwapBytes(MetaTypes.ConvertData<Vector3>(data, eoffset));
-                        SelfClosingTag(sb, cind, ename + " x=\"" + FloatUtil.ToString(v3a.X) + "\" y=\"" + FloatUtil.ToString(v3a.Y) + "\" z=\"" + FloatUtil.ToString(v3a.Z) + "\"");
+                        SelfClosingTagVector3(sb, cind, ename, v3a);
                         break;
                     case PsoDataType.Float4a: //TODO: check this! //...why are there 3 different types of float3?
                         var v3b = MetaTypes.SwapBytes(MetaTypes.ConvertData<Vector3>(data, eoffset));
-                        SelfClosingTag(sb, cind, ename + " x=\"" + FloatUtil.ToString(v3b.X) + "\" y=\"" + FloatUtil.ToString(v3b.Y) + "\" z=\"" + FloatUtil.ToString(v3b.Z) + "\"");
+                        SelfClosingTagVector3(sb, cind, ename, v3b);
                         break;
                     case PsoDataType.Float4:
                         var v4 = MetaTypes.SwapBytes(MetaTypes.ConvertData<Vector4>(data, eoffset));
-                        SelfClosingTag(sb, cind, ename + " x=\"" + FloatUtil.ToString(v4.X) + "\" y=\"" + FloatUtil.ToString(v4.Y) + "\" z=\"" + FloatUtil.ToString(v4.Z) + "\" w=\"" + FloatUtil.ToString(v4.W) + "\"");
+                        SelfClosingTagVector4(sb, cind, ename, v4);
                         break;
                     case PsoDataType.SInt: //TODO: convert hashes?
                         var int5Val = MetaTypes.SwapBytes(BitConverter.ToInt32(data, eoffset));
@@ -1860,7 +1860,7 @@ namespace CodeWalker.GameFiles
                 if (child is RbfFloat3)
                 {
                     var v3 = child as RbfFloat3;
-                    SelfClosingTag(sb, cind, v3.Name + " x=\"" + FloatUtil.ToString(v3.X) + "\" y=\"" + FloatUtil.ToString(v3.Y) + "\" z=\"" + FloatUtil.ToString(v3.Z) + "\"");
+                    SelfClosingTagVector3(sb, cind, v3.Name, new Vector3(v3.X, v3.Y, v3.Z));
                 }
 
 
@@ -1883,10 +1883,7 @@ namespace CodeWalker.GameFiles
 
         public static void Indent(StringBuilder sb, int indent)
         {
-            for (int i = 0; i < indent; i++)
-            {
-                sb.Append(" ");
-            }
+            sb.Append(' ', indent);
         }
         public static void ErrorXml(StringBuilder sb, int indent, string msg)
         {
@@ -1907,7 +1904,9 @@ namespace CodeWalker.GameFiles
             }
             else
             {
-                sb.Append(" name=\"" + metaName + "\">");
+                sb.Append(" name=\"");
+                sb.Append(metaName);
+                sb.Append("\">");
             }
             if (appendLine) sb.AppendLine();
         }
@@ -1949,6 +1948,48 @@ namespace CodeWalker.GameFiles
             sb.Append("<");
             sb.Append(val);
             sb.Append(" />");
+            sb.AppendLine();
+        }
+        public static void SelfClosingTagVector2(StringBuilder sb, int indent, string ename, Vector2 v)
+        {
+            Indent(sb, indent);
+            sb.Append('<');
+            sb.Append(ename);
+            sb.Append(" x=\"");
+            sb.Append(FloatUtil.ToString(v.X));
+            sb.Append("\" y=\"");
+            sb.Append(FloatUtil.ToString(v.Y));
+            sb.Append("\" />");
+            sb.AppendLine();
+        }
+        public static void SelfClosingTagVector3(StringBuilder sb, int indent, string ename, Vector3 v)
+        {
+            Indent(sb, indent);
+            sb.Append('<');
+            sb.Append(ename);
+            sb.Append(" x=\"");
+            sb.Append(FloatUtil.ToString(v.X));
+            sb.Append("\" y=\"");
+            sb.Append(FloatUtil.ToString(v.Y));
+            sb.Append("\" z=\"");
+            sb.Append(FloatUtil.ToString(v.Z));
+            sb.Append("\" />");
+            sb.AppendLine();
+        }
+        public static void SelfClosingTagVector4(StringBuilder sb, int indent, string ename, Vector4 v)
+        {
+            Indent(sb, indent);
+            sb.Append('<');
+            sb.Append(ename);
+            sb.Append(" x=\"");
+            sb.Append(FloatUtil.ToString(v.X));
+            sb.Append("\" y=\"");
+            sb.Append(FloatUtil.ToString(v.Y));
+            sb.Append("\" z=\"");
+            sb.Append(FloatUtil.ToString(v.Z));
+            sb.Append("\" w=\"");
+            sb.Append(FloatUtil.ToString(v.W));
+            sb.Append("\" />");
             sb.AppendLine();
         }
         public static void StringTag(StringBuilder sb, int indent, string name, string text)
@@ -2147,9 +2188,17 @@ namespace CodeWalker.GameFiles
         {
             return FloatUtil.GetVector4String(v);
         }
+        internal static readonly string[] HexByteLookup = InitHexLookup();
+        private static string[] InitHexLookup()
+        {
+            var table = new string[256];
+            for (int i = 0; i < 256; i++)
+                table[i] = i.ToString("X2");
+            return table;
+        }
         public static string FormatHexByte(byte b)
         {
-            return Convert.ToString(b, 16).ToUpperInvariant().PadLeft(2, '0'); //hex byte array
+            return HexByteLookup[b];
         }
 
         public static string FormatHashSwap(MetaHash h) //for use with WriteItemArray, swaps endianness
@@ -2189,7 +2238,7 @@ namespace CodeWalker.GameFiles
             //TODO: do extra hash lookup here
             //if(Lookup.TryGetValue(uh, out str)) ...
 
-            return "hash_" + uh.ToString("X").PadLeft(8, '0');
+            return $"hash_{uh:X8}";
 
         }
         public static string HashString(MetaHash h)
@@ -2208,7 +2257,7 @@ namespace CodeWalker.GameFiles
 
 
             if (!string.IsNullOrEmpty(str)) return str;
-            return "hash_" + h.Hex;
+            return $"hash_{(uint)h:X8}";
         }
         public static string HashString(TextHash h)
         {
@@ -2221,7 +2270,7 @@ namespace CodeWalker.GameFiles
             //TODO: do extra hash lookup here
             //if(Lookup.TryGetValue(uh, out str)) ...
 
-            return "hash_" + uh.ToString("X").PadLeft(8, '0');
+            return $"hash_{uh:X8}";
         }
 
 

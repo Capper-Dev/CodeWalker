@@ -234,7 +234,7 @@ namespace CodeWalker.GameFiles
             }
             else
             {
-                GC.Collect(); //try free up some of the previously used memory..
+                //GC removed - the runtime handles this automatically
             }
 
             UpdateStatus("Scan complete");
@@ -2502,6 +2502,8 @@ namespace CodeWalker.GameFiles
         public bool ContentThreadProc()
         {
             Monitor.Enter(updateSyncRoot);
+            try
+            {
 
             GameFile req;
             //bool loadedsomething = false;
@@ -2588,11 +2590,13 @@ namespace CodeWalker.GameFiles
             //whether or not we need another content thread loop
             bool itemsStillPending = (itemcount >= MaxItemsPerLoop);
 
-
-            Monitor.Exit(updateSyncRoot);
-
-
             return itemsStillPending;
+
+            }
+            finally
+            {
+                Monitor.Exit(updateSyncRoot);
+            }
         }
 
 

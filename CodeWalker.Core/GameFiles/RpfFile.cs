@@ -364,22 +364,19 @@ namespace CodeWalker.GameFiles
 
         public void ExtractScripts(string outputfolder, Action<string> updateStatus)
         {
-            FileStream fs = File.OpenRead(FilePath);
-            BinaryReader br = new BinaryReader(fs);
-
-            try
+            using (var fs = File.OpenRead(FilePath))
+            using (var br = new BinaryReader(fs))
             {
-                ExtractScripts(br, outputfolder, updateStatus);
+                try
+                {
+                    ExtractScripts(br, outputfolder, updateStatus);
+                }
+                catch (Exception ex)
+                {
+                    LastError = ex.ToString();
+                    LastException = ex;
+                }
             }
-            catch (Exception ex)
-            {
-                LastError = ex.ToString();
-                LastException = ex;
-            }
-
-            br.Close();
-            br.Dispose();
-            fs.Dispose();
         }
         private void ExtractScripts(BinaryReader br, string outputfolder, Action<string> updateStatus)
         {
@@ -900,23 +897,19 @@ namespace CodeWalker.GameFiles
         {
             try
             {
-                using (DeflateStream ds = new DeflateStream(new MemoryStream(bytes), CompressionMode.Decompress))
+                using (var ds = new DeflateStream(new MemoryStream(bytes), CompressionMode.Decompress))
+                using (var outstr = new MemoryStream())
                 {
-                    using (var outstr = new MemoryStream())
+                    ds.CopyTo(outstr);
+                    var outbuf = outstr.ToArray();
+
+                    if (outbuf.Length <= bytes.Length)
                     {
-                        ds.CopyTo(outstr);
-                        byte[] deflated = outstr.GetBuffer();
-                        byte[] outbuf = new byte[outstr.Length]; //need to copy to the right size buffer for output.
-                        Buffer.BlockCopy(deflated, 0, outbuf, 0, outbuf.Length);
-
-                        if (outbuf.Length <= bytes.Length)
-                        {
-                            LastError = "Warning: Decompressed data was smaller than compressed data...";
-                            //return null; //could still be OK for tiny things!
-                        }
-
-                        return outbuf;
+                        LastError = "Warning: Decompressed data was smaller than compressed data...";
+                        //return null; //could still be OK for tiny things!
                     }
+
+                    return outbuf;
                 }
             }
             catch (Exception ex)
@@ -928,17 +921,13 @@ namespace CodeWalker.GameFiles
         }
         public static byte[] CompressBytes(byte[] data) //TODO: refactor this with ResourceBuilder.Compress/Decompress
         {
-            using (MemoryStream ms = new MemoryStream())
+            using (var ms = new MemoryStream())
             {
                 using (var ds = new DeflateStream(ms, CompressionMode.Compress, true))
                 {
                     ds.Write(data, 0, data.Length);
-                    ds.Close();
-                    byte[] deflated = ms.GetBuffer();
-                    byte[] outbuf = new byte[ms.Length]; //need to copy to the right size buffer...
-                    Buffer.BlockCopy(deflated, 0, outbuf, 0, outbuf.Length);
-                    return outbuf;
                 }
+                return ms.ToArray();
             }
         }
 

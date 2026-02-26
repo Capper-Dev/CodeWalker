@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,6 +16,7 @@ namespace CodeWalker
 
         private LinkedList<TVal> loadedList = new LinkedList<TVal>();
         private Dictionary<TKey, LinkedListNode<TVal>> loadedListDict = new Dictionary<TKey, LinkedListNode<TVal>>();
+        private readonly object syncRoot = new object();
 
         public int Count
         {
@@ -42,101 +43,116 @@ namespace CodeWalker
 
         public TVal TryGet(TKey key)
         {
-            LinkedListNode<TVal> lln = null;
-            if (loadedListDict.TryGetValue(key, out lln))
+            lock (syncRoot)
             {
-                loadedList.Remove(lln);
-                loadedList.AddLast(lln);
-                lln.Value.LastUseTime = CurrentTime;
+                LinkedListNode<TVal> lln = null;
+                if (loadedListDict.TryGetValue(key, out lln))
+                {
+                    loadedList.Remove(lln);
+                    loadedList.AddLast(lln);
+                    lln.Value.LastUseTime = CurrentTime;
+                }
+                return (lln != null) ? lln.Value : null;
             }
-            return (lln != null) ? lln.Value : null;
         }
         public bool TryAdd(TKey key, TVal item)
         {
-            if (item.MemoryUsage == 0)
+            lock (syncRoot)
             {
-            }
-            item.Key = key;
-            if (CanAdd())
-            {
-                var lln = loadedList.AddLast(item);
-                loadedListDict.Add(key, lln);
-                Interlocked.Add(ref CurrentMemoryUsage, item.MemoryUsage);
-                return true;
-            }
-            else
-            {
-                //cache full, check the front of the list for oldest..
-                var oldlln = loadedList.First;
-                var cachetime = CacheTime;
-                int iter = 0, maxiter = 2;
-                while (!CanAdd() && (iter<maxiter))
+                if (item.MemoryUsage == 0)
                 {
-                    while ((!CanAdd()) && (oldlln != null) && ((CurrentTime - oldlln.Value.LastUseTime).TotalSeconds > cachetime))
-                    {
-                        Interlocked.Add(ref CurrentMemoryUsage, -oldlln.Value.MemoryUsage);
-                        loadedListDict.Remove(oldlln.Value.Key);
-                        loadedList.Remove(oldlln); //gc should free up memory later..
-                        oldlln.Value = null;
-                        oldlln = null;
-                        //GC.Collect();
-                        oldlln = loadedList.First;
-                    }
-                    cachetime *= 0.5;
-                    iter++;
                 }
-                if (CanAdd()) //see if there's enough memory now...
+                item.Key = key;
+                if (CanAdd())
                 {
-                    var newlln = loadedList.AddLast(item);
-                    loadedListDict.Add(key, newlln);
-                    Interlocked.Add(ref CurrentMemoryUsage, item.MemoryUsage);
+                    var lln = loadedList.AddLast(item);
+                    loadedListDict.Add(key, lln);
+                    CurrentMemoryUsage += item.MemoryUsage;
                     return true;
                 }
                 else
                 {
-                    //really shouldn't get here, but it's possible under stress.
+                    //cache full, check the front of the list for oldest..
+                    var oldlln = loadedList.First;
+                    var cachetime = CacheTime;
+                    int iter = 0, maxiter = 2;
+                    while (!CanAdd() && (iter<maxiter))
+                    {
+                        while ((!CanAdd()) && (oldlln != null) && ((CurrentTime - oldlln.Value.LastUseTime).TotalSeconds > cachetime))
+                        {
+                            CurrentMemoryUsage -= oldlln.Value.MemoryUsage;
+                            loadedListDict.Remove(oldlln.Value.Key);
+                            loadedList.Remove(oldlln); //gc should free up memory later..
+                            oldlln.Value = null;
+                            oldlln = null;
+                            //GC.Collect();
+                            oldlln = loadedList.First;
+                        }
+                        cachetime *= 0.5;
+                        iter++;
+                    }
+                    if (CanAdd()) //see if there's enough memory now...
+                    {
+                        var newlln = loadedList.AddLast(item);
+                        loadedListDict.Add(key, newlln);
+                        CurrentMemoryUsage += item.MemoryUsage;
+                        return true;
+                    }
+                    else
+                    {
+                        //really shouldn't get here, but it's possible under stress.
+                    }
                 }
+                return false;
             }
-            return false;
         }
 
         public bool CanAdd()
         {
-            return Interlocked.Read(ref CurrentMemoryUsage) < MaxMemoryUsage;
+            return CurrentMemoryUsage < MaxMemoryUsage;
         }
 
 
         public void Clear()
         {
-            loadedList.Clear();
-            loadedListDict.Clear();
-            CurrentMemoryUsage = 0;
+            lock (syncRoot)
+            {
+                loadedList.Clear();
+                loadedListDict.Clear();
+                CurrentMemoryUsage = 0;
+            }
         }
 
         public void Remove(TKey key)
         {
-            LinkedListNode<TVal> n;
-            if (loadedListDict.TryGetValue(key, out n))
+            lock (syncRoot)
             {
-                loadedListDict.Remove(key);
-                loadedList.Remove(n);
-                Interlocked.Add(ref CurrentMemoryUsage, -n.Value.MemoryUsage);
+                LinkedListNode<TVal> n;
+                if (loadedListDict.TryGetValue(key, out n))
+                {
+                    loadedListDict.Remove(key);
+                    loadedList.Remove(n);
+                    CurrentMemoryUsage -= n.Value.MemoryUsage;
+                }
             }
         }
 
 
         public void Compact()
         {
-            var oldlln = loadedList.First;
-            while (oldlln != null)
+            lock (syncRoot)
             {
-                if ((CurrentTime - oldlln.Value.LastUseTime).TotalSeconds < CacheTime) break;
-                var nextln = oldlln.Next;
-                Interlocked.Add(ref CurrentMemoryUsage, -oldlln.Value.MemoryUsage);
-                loadedListDict.Remove(oldlln.Value.Key);
-                loadedList.Remove(oldlln); //gc should free up memory later..
-                oldlln.Value = null;
-                oldlln = nextln;
+                var oldlln = loadedList.First;
+                while (oldlln != null)
+                {
+                    if ((CurrentTime - oldlln.Value.LastUseTime).TotalSeconds < CacheTime) break;
+                    var nextln = oldlln.Next;
+                    CurrentMemoryUsage -= oldlln.Value.MemoryUsage;
+                    loadedListDict.Remove(oldlln.Value.Key);
+                    loadedList.Remove(oldlln); //gc should free up memory later..
+                    oldlln.Value = null;
+                    oldlln = nextln;
+                }
             }
         }
 
