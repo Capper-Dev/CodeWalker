@@ -34,7 +34,7 @@ namespace CodeWalker.Rendering
         private object syncroot = new object(); //for thread safety
         public int multisamplecount { get; private set; } = 4; //should be a setting..
         public int multisamplequality { get; private set; } = 0; //should be a setting...
-        public Color clearcolour { get; private set; } = new Color(0.2f, 0.4f, 0.6f, 1.0f); //gross
+        public Color clearcolour { get; set; } = new Color(0.2f, 0.4f, 0.6f, 1.0f); //gross
         private System.Drawing.Size beginSize;
         private ViewportF Viewport;
         private bool autoStartLoop = false;

@@ -630,9 +630,55 @@ namespace CodeWalker.ClothingExporter
                 return "female";
 
             if (pathLower.Contains("\\peds\\") || pathLower.Contains("/peds/"))
+            {
+                string pedSub = ExtractPedSubfolder(pathLower);
+                if (pedSub != null)
+                    return Path.Combine("peds", pedSub);
                 return "peds";
+            }
 
             return null;
+        }
+
+        static string ExtractPedSubfolder(string pathLower)
+        {
+            int pedsIdx = pathLower.IndexOf("\\peds\\");
+            if (pedsIdx < 0) pedsIdx = pathLower.IndexOf("/peds/");
+            if (pedsIdx < 0) return null;
+
+            int afterPeds = pedsIdx + 6;
+
+            int rpfEnd = afterPeds;
+            string pedName = null;
+
+            while (rpfEnd < pathLower.Length)
+            {
+                int nextRpf = pathLower.IndexOf(".rpf\\", rpfEnd);
+                if (nextRpf < 0) nextRpf = pathLower.IndexOf(".rpf/", rpfEnd);
+                if (nextRpf < 0) break;
+
+                int segStart = nextRpf + 5;
+                if (segStart >= pathLower.Length) break;
+
+                int segEnd = pathLower.IndexOf('\\', segStart);
+                if (segEnd < 0) segEnd = pathLower.IndexOf('/', segStart);
+                if (segEnd < 0) break;
+
+                string segment = pathLower.Substring(segStart, segEnd - segStart);
+                if (string.IsNullOrEmpty(segment)) break;
+
+                if (segment.EndsWith(".rpf"))
+                {
+                    pedName = segment.Substring(0, segment.Length - 4);
+                    rpfEnd = segEnd + 1;
+                    continue;
+                }
+
+                pedName = segment;
+                break;
+            }
+
+            return pedName;
         }
 
         static string ExtractDlcName(string pathLower)
